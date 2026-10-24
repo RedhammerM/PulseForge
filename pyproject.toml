@@ -1,0 +1,34 @@
+[project]
+name = "physio-daq"
+version = "0.1.0"
+description = "Synchronized ECG (AD8232) + PPG (MAX30102) acquisition with an Arduino Nano"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "pyqt6>=6.6",
+    "pyserial>=3.5",
+    "scipy>=1.11",
+]
+
+[project.scripts]
+physio-daq = "physio_daq.cli:main"
+
+[dependency-groups]
+dev = ["ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/physio_daq"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
