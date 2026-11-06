@@ -1,0 +1,10 @@
+# Copy to ~/.config/physio/config.toml. Every setting is optional; these are the defaults.
+# data_dir = "~/Projects/physio-daq/data"
+# workout_csv = "~/notes/Gym/Log/workout_logs.csv"
+# subject_id = "S01"
+# timezone = "Europe/Bratislava"
+# repull_days = 3
+# request_delay_s = 1.0
+
+# Garmin shows the key's expiry only at creation. Set it to get a warning 14 days ahead.
+# garmin_key_expires = 2027-11-06

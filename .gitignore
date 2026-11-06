@@ -19,3 +19,6 @@ recordings/
 data/
 
 .DS_Store
+
+# Working notes for Claude, kept local
+arduino_project_context*.md

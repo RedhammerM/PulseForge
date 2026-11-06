@@ -5,7 +5,8 @@ reads an AD8232 ECG front end and a MAX30102 PPG sensor on one clock and streams
 them to a PC, where a live viewer records sessions with metadata.
 
 It is the data-collection layer of a larger project on HRV, autonomic coupling
-and recovery (processing and analysis live elsewhere). The point of recording
+and recovery. Garmin import, storage and analysis live in the `physio_state`
+package under [`analysis/`](analysis/README.md). The point of recording
 both signals together is **beat-to-beat pulse arrival time (PAT)**: ECG R-peak
 to PPG pulse foot, which a single-sensor HRV setup cannot provide.
 
@@ -84,6 +85,8 @@ src/physio_daq/
   viewer.py              live plot window
   cli.py                 command line entry point
 docs/                    hardware notes and data format
+analysis/src/physio_state/  Garmin sync, workout import, tables (separate package)
+tests/                   tests for physio_state
 ```
 
 ## Troubleshooting

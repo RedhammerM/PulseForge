@@ -1,0 +1,8 @@
+[Unit]
+Description=physio-state daily Garmin sync
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/uv run --project %h/Projects/physio-daq --package physio-state physio-state garmin sync
