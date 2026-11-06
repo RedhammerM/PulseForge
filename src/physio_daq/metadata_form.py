@@ -1,6 +1,9 @@
 """Small Qt form shown when Start is pressed. Values end up in the JSON."""
 
+from .config import STAND_PROTOCOL
+
 TESTS = [
+    STAND_PROTOCOL,
     "supine rest",
     "paced breathing 0.1 Hz",
     "spontaneous breathing",

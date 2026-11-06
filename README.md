@@ -23,6 +23,11 @@ to PPG pulse foot, which a single-sensor HRV setup cannot provide.
   reconnect on their own
 - Live view is always on; **Start** opens a metadata form and begins a recording
   that stops after 300 s (configurable)
+- **Check-in** records ratings before the cuff; BP is entered when the recording
+  ends, into the same session file
+- **Stand**, **Cuff** and **Mark** write events on the device clock. The seated rest
+  + active stand test is one 540 s recording, and the D4 button marks the stand,
+  then the cuff reading
 - Every recording: two CSV files + a JSON with metadata, timing quality
   (gaps, jitter, effective sampling rates), and SHA-256 checksums
 
@@ -66,7 +71,9 @@ On Linux add yourself to the `dialout` group for serial access.
 ```
 recordings/S01_20261023_103539_ecg.csv    t_us, ecg, lo_plus, lo_minus
 recordings/S01_20261023_103539_ppg.csv    t_us, ir, red, polled
+recordings/S01_20261023_103539_events.csv t_us, label, wall_utc
 recordings/S01_20261023_103539.json       metadata + quality summary
+recordings/S01_2026-10-23_AM_session.json ratings and cuff BP for the session
 ```
 
 Both CSVs use the same clock (`t_us`). Column and JSON reference:
@@ -82,6 +89,8 @@ src/physio_daq/
   session.py             one recording: CSV writers, timing stats, JSON
   acquisition.py         serial thread, preview vs recording state
   metadata_form.py       Qt form shown on Start
+  checkin.py             session file: ratings and cuff BP
+  checkin_form.py        Qt forms for the check-in
   viewer.py              live plot window
   cli.py                 command line entry point
 docs/                    hardware notes and data format

@@ -11,11 +11,22 @@ from pathlib import Path
 
 import serial
 
-from .config import BAUD, DEFAULT_DURATION_S, DEFAULT_OUTDIR, PPG_STALE_S
+from .config import (
+    BAUD,
+    DEFAULT_DURATION_S,
+    DEFAULT_OUTDIR,
+    PPG_STALE_S,
+    STAND_PROTOCOL,
+    STAND_PROTOCOL_DURATION_S,
+)
 from .protocol import EcgSample, FrameParser, PpgSample
 from .session import Session
 
 _MAX_PENDING = 20_000  # cap on undrained display samples (e.g. no viewer attached)
+
+
+def _clock_text(sec: float) -> str:
+    return f"{int(sec) // 60:02d}:{int(sec) % 60:02d}"
 
 
 class Acquisition(threading.Thread):
@@ -120,7 +131,11 @@ class Acquisition(threading.Thread):
                 self.int_mode = "int=1" in m
                 self._end_session("device reset")  # board rebooted mid-recording
             elif m.startswith("# BTN"):
-                self._end_session("stopped (button)")
+                if self._stand_protocol():
+                    labels = [label for _, label in self.session.events]
+                    self.mark("cuff" if "stand" in labels else "stand")
+                else:
+                    self._end_session("stopped (button)")
 
     def _on_ecg(self, s: EcgSample) -> None:
         with self.lock:
@@ -130,7 +145,7 @@ class Acquisition(threading.Thread):
                 del self.new_ecg[: _MAX_PENDING // 2]
             self.lo = (s.lo_plus, s.lo_minus)
             if self.session is not None and self.session.add_ecg(s):
-                self._end_session(f"auto-stop ({self.duration_s:g} s)")
+                self._end_session(f"auto-stop ({self.session.duration_s:g} s)")
 
     def _on_ppg(self, s: PpgSample) -> None:
         with self.lock:
@@ -158,6 +173,9 @@ class Acquisition(threading.Thread):
             self.messages.append(f"ERROR saving recording: {e}")
         self._send(b"r")  # LED off
 
+    def _stand_protocol(self) -> bool:
+        return self.session is not None and self.session.metadata.get("test") == STAND_PROTOCOL
+
     def _data_flowing(self) -> bool:
         return self.connected and self.last_rx is not None and time.time() - self.last_rx < 1.0
 
@@ -175,7 +193,9 @@ class Acquisition(threading.Thread):
             if not self.can_start():
                 return False
             self.metadata = dict(metadata)
-            self.session = Session(self.outdir, self.metadata, self.duration_s)
+            protocol = metadata.get("test") == STAND_PROTOCOL
+            duration = STAND_PROTOCOL_DURATION_S if protocol else self.duration_s
+            self.session = Session(self.outdir, self.metadata, duration)
             self._crc_at_start = self.parser.crc_errors
             self._send(b"R")  # LED on
             return True
@@ -183,6 +203,20 @@ class Acquisition(threading.Thread):
     def stop_recording(self) -> None:
         with self.lock:
             self._end_session("stopped")
+
+    def mark(self, label: str) -> bool:
+        """Add an event to the running recording. False if nothing is recording."""
+        with self.lock:
+            if self.session is None:
+                return False
+            self.session.add_event(label)
+            self.messages.append(f"event: {label} at {_clock_text(self.session.elapsed_s)}")
+            return True
+
+    def set_defaults(self, **values) -> None:
+        """Prefill the next metadata form."""
+        with self.lock:
+            self.metadata.update(values)
 
     def drain(self) -> tuple[list[int], list[int]]:
         """Return and clear the samples received since the last call."""
@@ -205,6 +239,9 @@ class Acquisition(threading.Thread):
                 "ppg_stale": ppg_age is None or ppg_age > PPG_STALE_S,
                 "int_mode": self.int_mode,
                 "elapsed": s.elapsed_s if s else 0.0,
+                "target_s": s.duration_s if s else 0.0,
+                "stand_protocol": self._stand_protocol(),
+                "events": {label: t / 1e6 for t, label in reversed(s.events)} if s else {},
                 "e_n": s.ecg.n if s else 0,
                 "p_n": s.ppg.n if s else 0,
                 "gaps": (s.ecg.gaps + s.ppg.gaps) if s else 0,

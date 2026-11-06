@@ -74,6 +74,16 @@ def _cmd_rebuild(cfg, args) -> int:
     return 0
 
 
+def _cmd_study_length(cfg, args) -> int:
+    from .models.simulate import study_length
+
+    table = study_length(reps=args.reps)
+    cfg.data_dir.mkdir(parents=True, exist_ok=True)
+    table.to_csv(cfg.data_dir / "study_length.csv", index=False)
+    print(table.to_string(index=False, float_format=lambda v: f"{v:.2f}"))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="physio-state")
     sub = p.add_subparsers(dest="command", required=True)
@@ -89,6 +99,12 @@ def main(argv: list[str] | None = None) -> int:
     b.set_defaults(func=_cmd_backfill)
     garmin.add_parser("status", help="what is stored").set_defaults(func=_cmd_status)
     sub.add_parser("rebuild", help="rebuild all tables from raw").set_defaults(func=_cmd_rebuild)
+    model = sub.add_parser("model", help="modeling").add_subparsers(
+        dest="model_command", required=True
+    )
+    s = model.add_parser("study-length", help="simulate how many weeks the study needs")
+    s.add_argument("--reps", type=int, default=200)
+    s.set_defaults(func=_cmd_study_length)
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     return args.func(load_config(), args)

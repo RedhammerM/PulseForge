@@ -7,14 +7,14 @@ import math
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from . import __version__
 from .config import ECG_FS, PPG_FS
 from .protocol import Clock, EcgSample, PpgSample
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 ECG_GAP_US = 1.5 * 1e6 / ECG_FS
 PPG_GAP_US = 1.5 * 1e6 / PPG_FS
 
@@ -79,7 +79,7 @@ class Session:
         self.outdir = outdir
         self.metadata = dict(metadata)
         self.duration_s = duration_s
-        self.start = datetime.now()
+        self.start = datetime.now().astimezone()
         self.stem = f"{_safe(metadata.get('subject') or '')}_{self.start:%Y%m%d_%H%M%S}"
 
         self._clock = Clock()
@@ -94,6 +94,10 @@ class Session:
         self._w_ecg, self._w_ppg = csv.writer(self._f_ecg), csv.writer(self._f_ppg)
         self._w_ecg.writerow(["t_us", "ecg", "lo_plus", "lo_minus"])
         self._w_ppg.writerow(["t_us", "ir", "red", "polled"])
+        self._f_events = open(outdir / f"{self.stem}_events.csv", "w", newline="")
+        self._w_events = csv.writer(self._f_events)
+        self._w_events.writerow(["t_us", "label", "wall_utc"])
+        self.events: list[tuple[float, str]] = []  # (t_us, label)
         self._last_flush = time.monotonic()
 
     @property
@@ -116,6 +120,14 @@ class Session:
         self.ppg_isr_lost += s.isr_lost
         self._w_ppg.writerow((t, s.ir, s.red, int(s.polled)))
 
+    def add_event(self, label: str) -> None:
+        """Mark the current moment, on the device clock of the newest ECG sample."""
+        wall = datetime.now(UTC).isoformat(timespec="milliseconds")
+        t = self.ecg.last_t or 0
+        self._w_events.writerow((t, label, wall))
+        self._f_events.flush()
+        self.events.append((t, label))
+
     def _flush_if_due(self) -> None:
         now = time.monotonic()
         if now - self._last_flush > 1.0:  # survive a crash with <= 1 s lost
@@ -127,16 +139,20 @@ class Session:
         """Close the files and write the JSON summary. Returns its path."""
         self._f_ecg.close()
         self._f_ppg.close()
+        self._f_events.close()
         sha = {
             k: hashlib.sha256((self.outdir / f"{self.stem}_{k}.csv").read_bytes()).hexdigest()
-            for k in ("ecg", "ppg")
+            for k in ("ecg", "ppg", "events")
         }
         e, p = self.ecg, self.ppg
         summary = {
             "schema_version": SCHEMA_VERSION,
             "software": f"physio-daq {__version__}",
+            "session_id": self.metadata.get("session_id"),
             "start": self.start.isoformat(timespec="seconds"),
-            "end": datetime.now().isoformat(timespec="seconds"),
+            "start_utc": self.start.astimezone(UTC).isoformat(timespec="seconds"),
+            "utc_offset_min": int(self.start.utcoffset().total_seconds() // 60),
+            "end": datetime.now().astimezone().isoformat(timespec="seconds"),
             "end_reason": reason,
             "target_duration_s": self.duration_s or None,
             "duration_s": round(self.elapsed_s, 3),
@@ -166,6 +182,11 @@ class Session:
                 "polled_rows": self.ppg_polled,
                 "isr_events_lost": self.ppg_isr_lost,
                 "sha256": sha["ppg"],
+            },
+            "events": {
+                "file": f"{self.stem}_events.csv",
+                "n_rows": len(self.events),
+                "sha256": sha["events"],
             },
             "metadata": self.metadata,
         }

@@ -11,7 +11,16 @@ from matplotlib.widgets import Button  # noqa: E402
 from scipy.signal import butter, iirnotch, sosfilt, sosfilt_zi, tf2sos  # noqa: E402
 
 from .acquisition import Acquisition  # noqa: E402
-from .config import ECG_FS, MAINS_HZ, NO_FINGER_IR, PPG_FS, WINDOW_SEC  # noqa: E402
+from .checkin import protocol_cue, save_session  # noqa: E402
+from .checkin_form import ask_bp, ask_checkin  # noqa: E402
+from .config import (  # noqa: E402
+    ECG_FS,
+    MAINS_HZ,
+    NO_FINGER_IR,
+    PPG_FS,
+    STAND_PROTOCOL,
+    WINDOW_SEC,
+)
 from .metadata_form import ask_metadata  # noqa: E402
 
 
@@ -63,7 +72,7 @@ class LiveViewer:
 
         self.fig, (ax_e, ax_p, ax_r) = plt.subplots(3, 1, figsize=(12, 8))
         self.axes = (ax_e, ax_p, ax_r)
-        self.fig.subplots_adjust(left=0.07, right=0.98, top=0.94, bottom=0.2, hspace=0.5)
+        self.fig.subplots_adjust(left=0.07, right=0.98, top=0.94, bottom=0.25, hspace=0.5)
         t_ecg = np.arange(self._n_ecg) / ECG_FS
         t_ppg = np.arange(self._n_ppg) / PPG_FS
         (self.l_ecg,) = ax_e.plot(t_ecg, np.zeros(self._n_ecg), lw=0.8, color="tab:green")
@@ -84,6 +93,26 @@ class LiveViewer:
             self.fig.add_axes([0.20, 0.03, 0.11, 0.07]), "Stop",
             color="#ffb3b3", hovercolor="#ff8080",
         )  # fmt: skip
+        self.b_checkin = Button(self.fig.add_axes([0.07, 0.115, 0.11, 0.06]), "Check-in")
+        self.b_stand = Button(
+            self.fig.add_axes([0.20, 0.115, 0.11, 0.06]), "Stand",
+            color="#ffe8a3", hovercolor="#ffd966",
+        )  # fmt: skip
+        self.b_cuff = Button(
+            self.fig.add_axes([0.33, 0.115, 0.11, 0.06]), "Cuff",
+            color="#ffe8a3", hovercolor="#ffd966",
+        )  # fmt: skip
+        self.b_mark = Button(self.fig.add_axes([0.46, 0.115, 0.11, 0.06]), "Mark")
+        self.b_checkin.on_clicked(self._on_checkin)
+        self.b_stand.on_clicked(lambda _e: self.acq.mark("stand"))
+        self.b_cuff.on_clicked(lambda _e: self.acq.mark("cuff"))
+        self.b_mark.on_clicked(lambda _e: self.acq.mark("mark"))
+        self.session_id: str | None = None
+        self.session_checkin: dict | None = None
+        self._protocol_running = False
+        self.t_session = self.fig.text(
+            0.59, 0.145, "no session (Check-in first)", family="monospace", fontsize=9, va="center"
+        )
         self.b_start.on_clicked(self._on_start)
         self.b_stop.on_clicked(lambda _e: self.acq.stop_recording())
         kw = {"family": "monospace", "fontsize": 9, "va": "center"}
@@ -105,7 +134,31 @@ class LiveViewer:
             return
         meta = ask_metadata(self.acq.get_metadata())
         if meta is not None:
-            self.acq.start_recording(meta)
+            self.acq.start_recording({**meta, "session_id": self.session_id})
+
+    def _on_checkin(self, _event) -> None:
+        """Ratings are saved here, before any cuff number is seen. BP follows the recording."""
+        if self.acq.state == "recording":
+            return
+        checkin = ask_checkin(self.acq.get_metadata().get("subject", ""))
+        if checkin is None:
+            return
+        save_session(self.acq.outdir, checkin)
+        self.session_id, self.session_checkin = checkin["session_id"], checkin
+        self.t_session.set_text(f"session {self.session_id}")
+        self.acq.set_defaults(
+            subject=checkin["subject"],
+            when={"AM": "morning", "PM": "evening"}[checkin["slot"]],
+            test=STAND_PROTOCOL,
+            posture="sitting",
+        )
+
+    def _ask_bp_after_protocol(self) -> None:
+        if self.session_checkin is None:
+            return
+        bp = ask_bp()
+        if bp is not None:
+            save_session(self.acq.outdir, {**self.session_checkin, **bp})
 
     # --------------------------------------------------------------- drawing
     @staticmethod
@@ -129,8 +182,10 @@ class LiveViewer:
         elif no_data:
             head, color = "WAITING FOR DATA FROM DEVICE...", "tab:red"
         elif snap["recording"]:
-            target = f" / {_clock(self.acq.duration_s)}" if self.acq.duration_s else ""
+            target = f" / {_clock(snap['target_s'])}" if snap["target_s"] else ""
             head, color = f"REC {_clock(snap['elapsed'])}{target}", "tab:green"
+            if snap["stand_protocol"]:
+                head += "   " + protocol_cue(snap["elapsed"], snap["events"])
         else:
             head, color = "PREVIEW (not recording) - press Start", "gray"
 
@@ -181,3 +236,8 @@ class LiveViewer:
         self.t2.set_text(line2)
         self.t3.set_text(line3)
         self.fig.canvas.draw_idle()
+
+        ended = self._protocol_running and not snap["stand_protocol"]
+        self._protocol_running = snap["stand_protocol"]
+        if ended:
+            self._ask_bp_after_protocol()

@@ -47,6 +47,7 @@ A new raw version is written only when the content changed. `tables/` and
 
 ```python
 import duckdb
+
 con = duckdb.connect("data/physio.duckdb", read_only=True)
 con.sql("select day, hrv_ln_mean, garmin_status from hrv_nightly order by day").df()
 ```
@@ -70,14 +71,29 @@ disk regularly.
 | `workout_sets`, `workouts` | set, workout | from the Obsidian CSV |
 | `load_events` | training event | a gym workout merges with its Garmin strength activity |
 | `load_daily` | day | `srpe_load` is null if any event that day lacks RPE or duration |
+| `sessions`, `anchors` | session | ratings are anchors: validation targets, never model inputs |
+| `bp_readings` | cuff reading | |
+| `recordings` | recording | timing quality; `checksums_ok` verifies the CSVs against their SHA-256 |
+| `events` | marker | device-clock time, e.g. stand onset |
 | `sync_runs` | run | |
 
 `day` is the wake-up date. Times are UTC with `utc_offset_min`. Columns starting
 `garmin_` are vendor outputs: benchmarks, never anchors or ground truth.
 
+## Model tools
+
+`day_panel` has one row per day and slot, in event order. Load columns hold the
+load that follows the row's observation. Overnight values sit on AM rows.
+Anchors and Garmin composite scores are deliberately not in this table.
+
+`physio-state model study-length` simulates how many weeks it takes to recover a
+fast (7 d) and a slow (42 d) time constant, and writes `data/study_length.csv`.
+Its inputs are assumptions, mainly the signal-to-noise ratio. Rerun it with
+values from the pilot.
+
 ## Logging RPE
 
-Add `rpe=7` to the notes of any set in a workout; the last one in the workout
-counts. Session RPE load is RPE × duration, with duration taken from the matching
+RPE comes from the watch's self-evaluation prompt. A note such as `rpe=7` on a set
+in the Obsidian log overrides it; the last note in the workout counts. Session RPE load is RPE × duration, with duration taken from the matching
 Garmin activity, or from first to last set if there is none. A single logged set
 with no Garmin activity has no duration, so its load stays null.

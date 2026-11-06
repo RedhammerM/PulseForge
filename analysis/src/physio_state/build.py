@@ -9,6 +9,8 @@ import pandas as pd
 from .config import Config
 from .garmin import fit, parse
 from .garmin.rawstore import RawStore
+from .panel.day_panel import build_day_panel
+from .recordings.ingest import ingest
 from .store import refresh_views, write_table
 from .training import load, obsidian
 
@@ -85,6 +87,9 @@ def rebuild(cfg: Config) -> dict[str, int]:
     events = load.build_load_events(workouts, activities, cfg.tz, wakes)
     tables["workout_sets"], tables["workouts"] = result.sets, workouts
     tables["load_events"], tables["load_daily"] = events, load.build_load_daily(events)
+
+    tables.update(ingest(cfg.recordings_dir, cfg.tz, wakes))
+    tables["day_panel"] = build_day_panel(tables)
 
     runs = _sync_runs(cfg)
     if not runs.empty:

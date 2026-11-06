@@ -15,6 +15,7 @@ ENV_PATH = "PHYSIO_CONFIG"
 class Config:
     data_dir: Path = Path("~/Projects/physio-daq/data").expanduser()
     workout_csv: Path = Path("~/notes/Gym/Log/workout_logs.csv").expanduser()
+    recordings_dir: Path = Path("~/Projects/physio-daq/recordings").expanduser()
     subject_id: str = "S01"
     timezone: str = "Europe/Bratislava"
     garmin_key_expires: date | None = None  # Garmin shows this only when the key is created
@@ -51,7 +52,7 @@ def load_config(path: Path | None = None) -> Config:
     unknown = set(raw) - set(known)
     if unknown:
         raise ValueError(f"unknown settings in {path}: {sorted(unknown)}")
-    for key in ("data_dir", "workout_csv"):
+    for key in ("data_dir", "workout_csv", "recordings_dir"):
         if key in raw:
             raw[key] = Path(raw[key]).expanduser()
     return Config(**raw)
