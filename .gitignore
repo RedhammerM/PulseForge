@@ -15,8 +15,8 @@ build/
 .vscode/ipch
 
 # Recorded physiological data: never commit (GDPR, personal health data)
-recordings/
-data/
+/recordings/
+/data/
 
 .DS_Store
 

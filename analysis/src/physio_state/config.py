@@ -39,6 +39,10 @@ class Config:
         return self.data_dir / "training" / "raw"
 
     @property
+    def manual_dir(self) -> Path:
+        return self.data_dir / "manual"
+
+    @property
     def db_path(self) -> Path:
         return self.data_dir / "physio.duckdb"
 

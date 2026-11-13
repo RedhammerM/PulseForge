@@ -55,7 +55,7 @@ def _cmd_backfill(cfg, args) -> int:
 
 def _cmd_status(cfg, args) -> int:
     raw = RawStore(cfg.raw_dir)
-    for endpoint in ("hrv", "sleep", "heart_rate", "daily_summary", "activities"):
+    for endpoint in ("hrv", "sleep", "heart_rate", "daily_summary", "weight", "activities"):
         keys = raw.keys(endpoint)
         span = f"{keys[0]} .. {keys[-1]}" if keys and endpoint != "activities" else ""
         print(f"{endpoint:14} {len(keys):5}  {span}")

@@ -170,6 +170,8 @@ def parse_daily_summary(payloads: list[dict]) -> pd.DataFrame:
         bb, rs = p.get("bodyBattery") or {}, p.get("respiration") or {}
         mv, im = p.get("movement") or {}, p.get("intensityMinutes") or {}
         cal, chron = p.get("calories") or {}, p.get("wellnessChronology") or {}
+        steps = mv.get("steps")
+        steps = steps if isinstance(steps, dict) else {"value": steps}
         rows.append(
             {
                 "day": p["calendarDate"],
@@ -180,7 +182,9 @@ def parse_daily_summary(payloads: list[dict]) -> pd.DataFrame:
                 "respiration_avg": rs.get("avgValue"),
                 "respiration_min": rs.get("minValue"),
                 "respiration_max": rs.get("maxValue"),
-                "steps": mv.get("steps"),
+                "steps": steps.get("value"),
+                "steps_goal": steps.get("goal"),
+                "distance_m": steps.get("distanceInMeters"),
                 "intensity_moderate_min": im.get("moderate"),
                 "intensity_vigorous_min": im.get("vigorous"),
                 "calories_active": cal.get("burnedActive"),
@@ -199,6 +203,40 @@ def parse_daily_summary(payloads: list[dict]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+# ---------------------------------------------------------------- weight
+WEIGHT_COLS = [
+    "day", "time_utc", "weight_kg", "bmi", "body_fat_pct", "body_water_pct",
+    "muscle_mass_kg", "bone_mass_kg", "source",
+]  # fmt: skip
+
+
+def _kg(grams: float | None) -> float | None:
+    return None if grams is None else round(grams / 1000, 2)
+
+
+def parse_weight(payloads: list[dict]) -> pd.DataFrame:
+    """One row per weigh-in. Garmin stores masses in grams."""
+    rows = [
+        {
+            "day": m.get("calendarDate") or p["summaryDate"],
+            "time_utc": None
+            if m.get("timestampGMT") is None
+            else pd.Timestamp(m["timestampGMT"], unit="ms", tz="UTC"),
+            "weight_kg": _kg(m.get("weight")),
+            "bmi": m.get("bmi"),
+            "body_fat_pct": m.get("bodyFat"),
+            "body_water_pct": m.get("bodyWater"),
+            "muscle_mass_kg": _kg(m.get("muscleMass")),
+            "bone_mass_kg": _kg(m.get("boneMass")),
+            "source": m.get("sourceType"),
+        }
+        for p in payloads
+        for m in p.get("allWeightMetrics") or []
+        if m.get("weight") is not None
+    ]
+    return _frame(rows, WEIGHT_COLS)
 
 
 # ------------------------------------------------------------ activities

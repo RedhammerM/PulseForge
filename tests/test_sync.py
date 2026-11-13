@@ -37,6 +37,9 @@ class FakeApi:
             "get_daily_heart_rate": {"heartRateValues": []},
             "get_activity": {"summaryDTO": {}},
             "get_heart_rate_zones": [{"sport": "DEFAULT"}],
+            "get_weight_measurements": {
+                "dailyWeightSummaries": [{"summaryDate": "2026-11-05", "allWeightMetrics": []}]
+            },
         }[method]
 
 
@@ -52,6 +55,7 @@ def test_second_run_adds_nothing_and_changes_are_kept(tmp_path):
     assert s.sync(api, cfg, date(2026, 11, 6)).changed == 4  # the 4 re-pulled days
     store = RawStore(cfg.raw_dir)
     assert len(list((store.root / "hrv").glob("2026-11-06_*"))) == 2
+    assert store.keys("weight") == ["2026-11-05"]
     assert store.load_json("hrv", "2026-11-06")["hrvSummary"]["calendarDate"] == "y"
 
 

@@ -9,6 +9,7 @@ import pandas as pd
 from .config import Config
 from .garmin import fit, parse
 from .garmin.rawstore import RawStore
+from .manual import manual_tables
 from .panel.day_panel import build_day_panel
 from .recordings.ingest import ingest
 from .store import refresh_views, write_table
@@ -70,6 +71,7 @@ def rebuild(cfg: Config) -> dict[str, int]:
     summaries = _payloads(raw, "daily_summary")
     if summaries:
         tables["daily_summary"] = _dates(parse.parse_daily_summary(summaries))
+    tables["weight"] = _dates(parse.parse_weight(_payloads(raw, "weight")))
     items = [
         (raw.load_json("activities", k), raw.load_json("activity_detail", k))
         for k in raw.keys("activities")
@@ -90,6 +92,7 @@ def rebuild(cfg: Config) -> dict[str, int]:
 
     tables.update(ingest(cfg.recordings_dir, cfg.tz, wakes))
     tables["day_panel"] = build_day_panel(tables)
+    tables.update(manual_tables(cfg))
 
     runs = _sync_runs(cfg)
     if not runs.empty:

@@ -6,7 +6,8 @@ them to a PC, where a live viewer records sessions with metadata.
 
 It is the data-collection layer of a larger project on HRV, autonomic coupling
 and recovery. Garmin import, storage and analysis live in the `physio_state`
-package under [`analysis/`](analysis/README.md). The point of recording
+package under [`analysis/`](analysis/README.md); the dashboards live in
+[`app/`](app/README.md). The point of recording
 both signals together is **beat-to-beat pulse arrival time (PAT)**: ECG R-peak
 to PPG pulse foot, which a single-sensor HRV setup cannot provide.
 
@@ -21,8 +22,9 @@ to PPG pulse foot, which a single-sensor HRV setup cannot provide.
   (see [data format](docs/data_format.md#timing))
 - Binary protocol with CRC-8 and automatic resynchronisation; serial dropouts
   reconnect on their own
-- Live view is always on; **Start** opens a metadata form and begins a recording
-  that stops after 300 s (configurable)
+- Live view (PyQt6 + pyqtgraph) is always on; **Start** opens a metadata form and
+  begins a recording that stops after 300 s (configurable). Keys: Space start/stop,
+  S stand, C cuff, M mark
 - **Check-in** records ratings before the cuff; BP is entered when the recording
   ends, into the same session file
 - **Stand**, **Cuff** and **Mark** write events on the device clock. The seated rest
@@ -55,8 +57,9 @@ Requires [uv](https://docs.astral.sh/uv/) and [PlatformIO](https://platformio.or
 pio run -t upload
 
 # 2. Software
-uv sync
-uv run physio-daq --list-ports
+uv sync --all-packages
+uv run physio-app                                       # dashboards; Measure opens the live window
+uv run physio-daq --list-ports                          # or run the live window on its own:
 uv run physio-daq --port /dev/ttyUSB0 --subject S01     # COM4 on Windows
 ```
 
@@ -91,11 +94,12 @@ src/physio_daq/
   metadata_form.py       Qt form shown on Start
   checkin.py             session file: ratings and cuff BP
   checkin_form.py        Qt forms for the check-in
-  viewer.py              live plot window
+  viewer.py              live plot window (pyqtgraph)
   cli.py                 command line entry point
 docs/                    hardware notes and data format
-analysis/src/physio_state/  Garmin sync, workout import, tables (separate package)
-tests/                   tests for physio_state
+analysis/src/physio_state/  Garmin sync, workout import, tables, manual logs (separate package)
+app/src/physio_app/      Streamlit dashboards (separate package)
+tests/                   tests for all three packages
 ```
 
 ## Troubleshooting

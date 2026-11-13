@@ -140,3 +140,31 @@ def test_fit_record_keeps_no_position():
 def test_fit_rr_drops_unset_slots():
     assert fit.rr_values(FakeFrame(time=(0.8, 0.75, None))) == [800, 750]
     assert fit.rr_values(FakeFrame()) == []
+
+
+def test_daily_summary_splits_steps():
+    payload = {
+        "calendarDate": "2026-10-25",
+        "movement": {"steps": {"value": 9000, "goal": 7000, "distanceInMeters": 6500.0}},
+    }
+    row = parse.parse_daily_summary([payload]).iloc[0]
+    assert (row["steps"], row["steps_goal"], row["distance_m"]) == (9000, 7000, 6500.0)
+
+
+def test_weight_is_one_row_per_weigh_in_in_kg():
+    metric = {
+        "calendarDate": "2026-10-25",
+        "timestampGMT": 1792911212741,
+        "weight": 77300.0,
+        "bodyFat": 15.5,
+        "muscleMass": 35000.0,
+        "sourceType": "MANUAL",
+    }
+    payload = {
+        "summaryDate": "2026-10-25",
+        "allWeightMetrics": [metric, {**metric, "weight": 77100.0}, {**metric, "weight": None}],
+    }
+    df = parse.parse_weight([payload])
+    assert df["weight_kg"].tolist() == [77.3, 77.1]
+    assert df.iloc[0]["muscle_mass_kg"] == 35.0 and df.iloc[0]["body_fat_pct"] == 15.5
+    assert str(df.iloc[0]["time_utc"].tz) == "UTC"

@@ -6,9 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
-    "matplotlib>=3.8",
     "numpy>=1.26",
     "pyqt6>=6.6",
+    "pyqtgraph>=0.13.7",
     "pyserial>=3.5",
     "scipy>=1.11",
 ]
@@ -20,7 +20,7 @@ physio-daq = "physio_daq.cli:main"
 dev = ["pytest>=8", "ruff>=0.6"]
 
 [tool.uv.workspace]
-members = ["analysis"]
+members = ["analysis", "app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,6 +1,7 @@
 """Command line entry point: `physio-daq --port /dev/ttyUSB0`."""
 
 import argparse
+import json
 
 from .config import BAUD, DEFAULT_DURATION_S, DEFAULT_OUTDIR
 
@@ -33,6 +34,9 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_DURATION_S,
         help="auto-stop after this many seconds (0 = manual stop only)",
     )
+    ap.add_argument("--session-id", help="session already checked in (BP is asked after it)")
+    ap.add_argument("--defaults", type=json.loads, default={},
+                    help="JSON object that prefills the metadata form")  # fmt: skip
     args = ap.parse_args(argv)
 
     if args.list_ports:
@@ -43,14 +47,14 @@ def main(argv: list[str] | None = None) -> int:
 
     # Imported late so that --help and --list-ports work without Qt.
     from .acquisition import Acquisition
-    from .viewer import LiveViewer
+    from .viewer import run
 
     acq = Acquisition(args.port, args.baud, args.outdir, args.subject, args.notes, args.duration)
+    acq.set_defaults(**args.defaults)
     acq.start()
     try:
-        LiveViewer(acq).show()
+        return run(acq, args.session_id)
     except KeyboardInterrupt:
-        pass
+        return 0
     finally:
         acq.shutdown()
-    return 0

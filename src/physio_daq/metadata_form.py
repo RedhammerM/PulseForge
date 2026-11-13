@@ -18,15 +18,14 @@ POSTURE = ["supine", "sitting", "standing"]
 CAFFEINE = ["n/a", "no", "yes"]
 
 
-def ask_metadata(current: dict) -> dict | None:
+def ask_metadata(current: dict, parent=None) -> dict | None:
     """Show the form prefilled with `current`; return the new values or None.
 
-    Uses whichever Qt binding matplotlib found. Numeric fields left on "n/a"
-    are returned as None.
+    Numeric fields left on "n/a" are returned as None.
     """
-    from matplotlib.backends.qt_compat import QtWidgets as W
+    from PyQt6 import QtWidgets as W
 
-    dlg = W.QDialog()
+    dlg = W.QDialog(parent)
     dlg.setWindowTitle("New recording - metadata")
     form = W.QFormLayout()
 

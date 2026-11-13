@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 DAILY_SUMMARY_CHUNK_DAYS = 28
 ACTIVITY_PAGE = 45
 HRV_SUMMARY_CHUNK_DAYS = 365
+WEIGHT_CHUNK_DAYS = 90
 EXPIRY_WARNING_DAYS = 14
 
 
@@ -79,6 +80,13 @@ class Syncer:
             payload = self._get("get_daily_summaries", a, b) or {}
             for item in payload.get("data", []):
                 self._save("daily_summary", item["calendarDate"], item)
+
+    def fetch_weight(self, start: date, end: date) -> None:
+        """One raw file per day that has weigh-ins (all measurements of that day)."""
+        for a, b in date_chunks(start, end, WEIGHT_CHUNK_DAYS):
+            payload = self._get("get_weight_measurements", a, b) or {}
+            for item in payload.get("dailyWeightSummaries") or []:
+                self._save("weight", item["summaryDate"], item)
 
     def fetch_activities(self, start: date, end: date) -> None:
         offset = 0
@@ -152,6 +160,7 @@ def sync(api, cfg: Config, today: date) -> RunReport:
         for i in range((today - start).days + 1):
             syncer.fetch_day(start + timedelta(days=i))
         syncer.fetch_daily_summaries(start, today)
+        syncer.fetch_weight(start, today)
         newest = _newest_activity_date(store)
         since = start if newest is None else min(start, newest - timedelta(days=cfg.repull_days))
         syncer.fetch_activities(since, today)
@@ -176,6 +185,7 @@ def backfill(api, cfg: Config, start: date, end: date) -> RunReport:
                 if store.latest("hrv", day.isoformat()) is None:
                     syncer.fetch_day(day)
         syncer.fetch_daily_summaries(start, end)
+        syncer.fetch_weight(start, end)
         syncer.fetch_activities(start, end)
 
     return _run(report, cfg, work)

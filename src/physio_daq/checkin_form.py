@@ -5,10 +5,10 @@ from datetime import datetime
 from .checkin import BP_READINGS, RATINGS, make_bp, make_checkin, session_day_slot
 
 
-def _dialog(title: str, ok_text: str):
-    from matplotlib.backends.qt_compat import QtWidgets as W
+def _dialog(title: str, ok_text: str, parent=None):
+    from PyQt6 import QtWidgets as W
 
-    dlg = W.QDialog()
+    dlg = W.QDialog(parent)
     dlg.setWindowTitle(title)
     form = W.QFormLayout()
     outer = W.QVBoxLayout(dlg)
@@ -37,12 +37,12 @@ def _value(sp) -> int | None:
     return None if sp.value() == sp.minimum() else sp.value()
 
 
-def ask_checkin(subject: str) -> dict | None:
-    from matplotlib.backends.qt_compat import QtCore
+def ask_checkin(subject: str, parent=None) -> dict | None:
+    from PyQt6 import QtCore
 
     now = datetime.now()
     day, slot = session_day_slot(now)
-    W, dlg, form = _dialog("Session check-in (before the cuff)", "Save")
+    W, dlg, form = _dialog("Session check-in (before the cuff)", "Save", parent)
     subject_edit = W.QLineEdit(subject)
     day_edit = W.QDateEdit(QtCore.QDate.fromString(day, "yyyy-MM-dd"))
     day_edit.setDisplayFormat("yyyy-MM-dd")
@@ -70,9 +70,9 @@ def ask_checkin(subject: str) -> dict | None:
     )
 
 
-def ask_bp() -> dict | None:
+def ask_bp(parent=None) -> dict | None:
     """Opens when the recording ends. A reading left on n/a is not stored."""
-    W, dlg, form = _dialog("Cuff BP readings of this session", "Save")
+    W, dlg, form = _dialog("Cuff BP readings of this session", "Save", parent)
     rows = {k: (_spin(W, 60, 260), _spin(W, 30, 160), _spin(W, 30, 200)) for k in BP_READINGS}
     arm = W.QComboBox()
     arm.addItems(["left", "right"])

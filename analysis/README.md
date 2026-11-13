@@ -37,13 +37,14 @@ journalctl --user -u physio-garmin-sync     # logs
 garmin/raw/<endpoint>/<date or id>_<fetch time>.json|zip   untouched responses
 garmin/raw/manifest.jsonl                                  SHA-256 and fetch time
 garmin/sync_runs.jsonl                                     one line per run
+manual/*.jsonl                                             food log, journal, recording notes (typed in the app)
 training/raw/obsidian/                                     snapshots of the workout CSV
 tables/*.parquet                                           parsed tables
 physio.duckdb                                              views over tables
 ```
 
 A new raw version is written only when the content changed. `tables/` and
-`physio.duckdb` can be deleted and rebuilt. Query with DuckDB:
+`physio.duckdb` can be deleted and rebuilt. `manual/` cannot: it is the only copy. Query with DuckDB:
 
 ```python
 import duckdb
@@ -53,8 +54,8 @@ con.sql("select day, hrv_ln_mean, garmin_status from hrv_nightly order by day").
 ```
 
 **Backup.** `recordings/` and `data/` are git-ignored and nothing backs them up
-automatically. Recordings cannot be re-fetched, so copy both to an encrypted
-disk regularly.
+automatically. Recordings and `data/manual/` cannot be re-fetched, so copy both
+folders to an encrypted disk regularly.
 
 ## Tables
 
@@ -64,7 +65,8 @@ disk regularly.
 | `hrv_nightly` | night | own aggregates from readings; `garmin_*` are benchmarks |
 | `sleep_nightly` | night | |
 | `hr_2min`, `hr_daily` | sample, day | |
-| `daily_summary` | calendar day | |
+| `daily_summary` | calendar day | includes `calories_total`/`calories_active` (burned) and `steps` |
+| `weight` | weigh-in | kg; body composition only if the scale reports it |
 | `activities` | activity | no title, location, owner or GPS fields |
 | `activity_samples`, `activity_rr` | second, RR interval | from FIT; `activity_rr` needs a strap that logs HRV |
 | `hr_zones` | sport and stored version | |
@@ -76,6 +78,9 @@ disk regularly.
 | `recordings` | recording | timing quality; `checksums_ok` verifies the CSVs against their SHA-256 |
 | `events` | marker | device-clock time, e.g. stand onset |
 | `sync_runs` | run | |
+| `nutrition_daily` | day | intake typed in the app |
+| `journal` | day | tags (alcohol, illness, travel, …) and a note |
+| `recording_notes` | recording | your quality flag (good/usable/bad) and note |
 
 `day` is the wake-up date. Times are UTC with `utc_offset_min`. Columns starting
 `garmin_` are vendor outputs: benchmarks, never anchors or ground truth.
